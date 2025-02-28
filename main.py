@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -76,6 +76,18 @@ def get_day_of_week() -> int:
     # Monday is 0 and Sunday is 6
     return datetime.now().weekday()
 
+def generate_csv():
+    # Generate a CSV file with data from the database
+    data = load_database() or {}
+    with open('database.csv', 'w') as file:
+        file.write("identifier,day,time,occupancy\n")
+        for identifier, days in data.items():
+            for day, times in days.items():
+                for time, occupancy in times.items():
+                    for count in occupancy:
+                        file.write(f"{identifier},{day},{time},{count}\n")
+
+    return "database.csv"
 
 def get_nearest_quarters(time_str: str) -> tuple[str, str]:
     time = datetime.strptime(time_str, "%H:%M")
@@ -149,8 +161,30 @@ async def periodic_task():
 
         await asyncio.sleep(15*60) # 15 minutes
 
+
+def database_set_negative_to_zero():
+    data = load_database() or {}
+
+    # Iterate through all parking lots
+    for identifier in data:
+        # Iterate through all days
+        for day in data[identifier]:
+            # Iterate through all times
+            for time in data[identifier][day]:
+                # Iterate through all occupancy values
+                for i in range(len(data[identifier][day][time])):
+                    # Set negative values to zero
+                    if data[identifier][day][time][i] < 0:
+                        data[identifier][day][time][i] = 0
+
+    # Save the updated database
+    save_database(data)
+    return data
+
+
 @app.get("/api/v1")
 async def root():
+    database_set_negative_to_zero()
     return JSONResponse(content=jsonable_encoder({"message": "Welcome to the parking occupancy API"}), status_code=status.HTTP_200_OK)
 
 @app.get("/api/v1/parking-occupancy/{id}")
@@ -180,3 +214,13 @@ async def get_history(id: int, credentials: Annotated[HTTPBasicCredentials, Depe
     if expected_occupancy == -1:
         return JSONResponse(content=jsonable_encoder({"error": "No data available"}), status_code=status.HTTP_404_NOT_FOUND)
     return JSONResponse(content=jsonable_encoder({"expected_occupancy": expected_occupancy}), status_code=status.HTTP_200_OK)
+
+@app.get("/api/v1/admin/csv")
+async def get_csv(credentials: Annotated[HTTPBasicCredentials, Depends(is_authorized)]):
+    file_path = generate_csv()
+    return FileResponse(
+        path=file_path,
+        filename="database.csv",
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=database.csv"}
+    )
