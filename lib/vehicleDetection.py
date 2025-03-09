@@ -1,4 +1,5 @@
 from ultralytics import YOLO
+import numpy as np
 import os
 import cv2
 import argparse
@@ -90,21 +91,63 @@ def main(image_path, conf_threshold=0.3, dest_path=None):
         print(f"An error occurred: {str(e)}")
 
 # Function to count vehicles in an image (e.g. for API)
-def count_vehicle(image_path, conf_threshold=0.3):
+def count_vehicle(image_data, conf_threshold=0.3):
     if conf_threshold < 0 or conf_threshold > 1:
         raise ValueError("Confidence threshold must be between 0 and 1")
 
-    if not image_path:
-        raise ValueError("Image path is required")
+    if not image_data:
+        raise ValueError("Image data is required")
 
     try:
-        # Process image
-        result_image, vehicle_count = detect_vehicles(image_path, conf_threshold)
+        # Pokud je image_data BytesIO objekt, převeďte ho na numpy array
+        if hasattr(image_data, 'read'):
+            # Resetujte pozici v BytesIO objektu
+            image_data.seek(0)
+            # Načtěte data jako numpy array
+            image_bytes = np.frombuffer(image_data.read(), np.uint8)
+            # Dekódujte obrázek pomocí OpenCV
+            image = cv2.imdecode(image_bytes, cv2.IMREAD_COLOR)
+        else:
+            # Pokud je to cesta k souboru, použijte cv2.imread
+            image = cv2.imread(image_data)
+
+        if image is None:
+            raise ValueError("Could not load image")
+
+        # List of vehicle classes in COCO dataset
+        vehicle_classes = ['car', 'motorcycle', 'bus', 'truck']
+
+        # Load YOLOv8 model
+        model = YOLO('yolo11n.pt')
+
+        # Run detection
+        results = model(image)
+
+        # Counter for vehicles
+        vehicle_count = 0
+
+        # Process detections
+        for result in results:
+            boxes = result.boxes
+            for box in boxes:
+                # Get class name
+                cls = result.names[int(box.cls[0])]
+
+                # Check if detected object is a vehicle
+                if cls in vehicle_classes:
+                    # Get confidence score
+                    conf = float(box.conf[0])
+
+                    # Continue only if confidence is above threshold
+                    if conf >= conf_threshold:
+                        vehicle_count += 1
 
         return vehicle_count
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
+        raise
+
 
 if __name__ == "__main__":
     # Parse command line arguments

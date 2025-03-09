@@ -1,0 +1,40 @@
+[
+  {
+    "id": 1,
+    "url": "http://localhost:5000/snap.jpg",
+    "name": "GHB - Učitelé",
+    "maxParkingSpaces": 17,
+    "maxHandicappedSpaces": 2,
+    "paidTime": "Po-Pá: 7-17",
+    "prices": [
+      {"time": "Prvních 30min", "price": 3},
+      {"time": "Každá další hodina", "price": 15}
+    ],
+    "center": [49.608902, 15.579536],
+    "polygon": [
+      [49.608989, 15.579777],
+      [49.608791, 15.579724],
+      [49.608815, 15.579332],
+      [49.609031, 15.579370]
+    ]
+  },
+  {
+    "id": 2,
+    "url": "",
+    "name": "Náměstí",
+    "maxParkingSpaces": 30,
+    "maxHandicappedSpaces": 4,
+    "paidTime": "Po-Pá: 7-17",
+    "prices": [
+      {"time": "Prvních 30min", "price": 3},
+      {"time": "Každá další hodina", "price": 15}
+    ],
+    "center": [49.606914, 15.579386],
+    "polygon": [
+      [49.606532, 15.578774],
+      [49.606483, 15.579793],
+      [49.607324, 15.579847],
+      [49.607289, 15.579118]
+    ]
+  }
+]
