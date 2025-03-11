@@ -218,7 +218,7 @@ def calculate_expected_occupancy(data, identifier, day, time) -> int:
         time_difference += 24 * 60
 
     # Parametry pro predikci
-    DECAY_FACTOR = 0.1
+    DECAY_FACTOR = 1.25
     PAST_DAYS = 5
 
     # Výpočet váhy pro aktuální obsazenost
