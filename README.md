@@ -100,4 +100,4 @@ The system uses YOLOv8 for vehicle detection. It can detect cars, motorcycles, b
 
 ## License
 
-[Include your license information here]
+This project is licensed under the MIT License - see the LICENSE file for details.
