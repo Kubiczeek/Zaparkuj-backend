@@ -131,7 +131,6 @@ def get_nearest_quarters(time_str: str) -> int:
 
 def get_historical_occupancy(data, identifier, day, target_time, past_days=5, decay_factor=0.3) -> float:
     """Spočítá váženou historickou obsazenost pro daný čas."""
-    # Získání nejbližšího 15minutového intervalu
     target_time_quarter = get_nearest_quarters(target_time)
 
     # Převod času zpět na formát HH:MM
@@ -140,26 +139,20 @@ def get_historical_occupancy(data, identifier, day, target_time, past_days=5, de
     weights = np.exp(-decay_factor * np.arange(past_days))
     weights /= weights.sum()
 
-    # Pro každý z minulých dnů získáme data o obsazenosti
     occupancy_values = []
 
     for i in range(past_days):
-        # Výpočet dne v týdnu (0-6) pro daný minulý den
         past_day = (day - i) % 7
 
-        # Získání dat o obsazenosti pro daný den a čas
         if identifier in data and past_day in data[identifier] and target_time_str in data[identifier][past_day]:
-            # Použijeme průměr z dostupných hodnot
             occupancy_data = data[identifier][past_day][target_time_str]
             # Filter out None values before summing
             valid_data = [x for x in occupancy_data if x is not None]
             avg_occupancy = sum(valid_data) / len(valid_data) if valid_data else 0
             occupancy_values.append(avg_occupancy)
         else:
-            # Pokud data nejsou k dispozici, použijeme 0
             occupancy_values.append(0)
 
-    # Výpočet váženého průměru
     if occupancy_values:
         return np.dot(weights[:len(occupancy_values)], occupancy_values)
     return 0
@@ -171,7 +164,6 @@ def get_deltaO(data, identifier, day, target_time, past_days=5) -> float:
     time_parts = [int(x) for x in target_time.split(":")]
     minutes = time_parts[0] * 60 + time_parts[1]
 
-    # Výpočet dolního a horního času
     lower_minutes = minutes - 15
     upper_minutes = minutes + 15
 
@@ -190,52 +182,47 @@ def calculate_expected_occupancy(data, identifier, day, time) -> int:
     if identifier not in data or day not in data[identifier]:
         return -1
 
-    # Získání aktuální obsazenosti z IP kamery
     parking_data = load_parking_data()
     parking_info = next((p for p in parking_data if p["id"] == identifier), None)
 
     if not parking_info or not parking_info.get("url"):
         return -1
 
-    # Získání obrázku z IP kamery
     image_data = get_image_from_camera(parking_info["url"])
     if not image_data:
         return -1
 
-    # Získání aktuální obsazenosti z obrázku
     current_occupancy = count_vehicle(image_data)
 
-    # Aktuální čas
     current_time = get_current_time_to_quarter_hour()
 
-    # Výpočet rozdílu v minutách mezi aktuálním časem a cílovým časem
     current_minutes = sum(int(x) * (60 if i == 0 else 1) for i, x in enumerate(current_time.split(":")))
     target_minutes = sum(int(x) * (60 if i == 0 else 1) for i, x in enumerate(time.split(":")))
     time_difference = target_minutes - current_minutes
 
-    # Pokud je cílový čas před aktuálním, předpokládáme, že je to další den
     if time_difference < 0:
         time_difference += 24 * 60
 
-    # Parametry pro predikci
-    DECAY_FACTOR = 1.25
+    THRESHOLD_MINUTES = 15
+    NORMAL_DECAY_FACTOR = 0.2
+    RAPID_DECAY_BASE = 0.7
     PAST_DAYS = 5
+    HISTORICAL_DECAY = 0.3
 
-    # Výpočet váhy pro aktuální obsazenost
-    weight = exp(-DECAY_FACTOR * (time_difference / 60))
+    if time_difference <= THRESHOLD_MINUTES:
+        weight = exp(-NORMAL_DECAY_FACTOR * (time_difference / 60))
+    else:
+        extra_minutes = time_difference - THRESHOLD_MINUTES
+        weight = exp(-NORMAL_DECAY_FACTOR * (THRESHOLD_MINUTES / 60)) * (RAPID_DECAY_BASE ** extra_minutes)
 
-    # Získání historické obsazenosti
-    historical_occupancy = get_historical_occupancy(data, identifier, day, time, PAST_DAYS, 0.3)
+    historical_occupancy = get_historical_occupancy(data, identifier, day, time, PAST_DAYS, HISTORICAL_DECAY)
 
-    # Výpočet změny obsazenosti
     deltaO = get_deltaO(data, identifier, day, time, PAST_DAYS)
     deltaO_adjusted = (time_difference / 15) * deltaO
 
-    # Predikce obsazenosti
     predicted_occupancy = (weight * (current_occupancy + deltaO_adjusted)) + ((1 - weight) * historical_occupancy)
 
     return ceil(predicted_occupancy)
-
 
 async def periodic_task():
     while True:
